@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rocket Sandbox – 상승과 단 분리</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#fff;--panel:rgba(12,15,26,.84);--line:#fff;--sh:#000;--acc:#ffd400;--hot:#ff4d2e;--dim:#8b93a8;--accink:#111;color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--ink:#111;--panel:rgba(255,255,255,.88);--line:#111;--sh:#111;--dim:#555;color-scheme:light}}
+:root[data-theme="light"]{--ink:#111;--panel:rgba(255,255,255,.88);--line:#111;--sh:#111;--dim:#555;color-scheme:light}
+:root[data-theme="dark"]{--ink:#fff;--panel:rgba(12,15,26,.84);--line:#fff;--sh:#000;--dim:#8b93a8;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#05060c;overflow:hidden;font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;color:var(--ink);user-select:none;-webkit-user-select:none}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.an{font-family:Anton,Impact,'Arial Narrow',sans-serif;letter-spacing:.04em;font-weight:400}
+#top{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);padding:10px 14px;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+h1{margin:0;font-size:clamp(22px,4vw,38px);color:var(--acc);text-shadow:3px 3px 0 #000;transform:skew(-6deg)}
+#steps{display:flex;gap:8px;margin:0;padding:0;list-style:none;flex-wrap:wrap;justify-content:center}
+#steps li{padding:4px 12px;border:3px solid var(--line);background:var(--panel);box-shadow:3px 3px 0 var(--sh);font-size:13px;font-weight:700;opacity:.55}
+#steps li.on{opacity:1;background:var(--acc);color:#111;border-color:#111;transform:rotate(-1.5deg) scale(1.05)}
+#steps li.ok{opacity:.9}
+#steps li.ok::after{content:" ✔"}
+#hint{margin:0;max-width:640px;text-align:center;font-size:13px;background:var(--panel);padding:4px 10px;border:2px solid var(--line);border-radius:4px}
+.panel{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--panel);border:3px solid var(--line);box-shadow:5px 5px 0 var(--sh);padding:10px 12px;font-size:12px}
+#tele{left:10px;width:230px}
+#ctl{right:10px;width:260px;display:flex;flex-direction:column;gap:7px}
+.row{display:flex;justify-content:space-between;gap:6px;padding:1px 0}
+.row b{font-family:Anton,Impact,sans-serif;font-weight:400;letter-spacing:.05em;font-size:15px;color:var(--acc)}
+.row span{color:var(--dim)}
+.fuel{display:flex;align-items:center;gap:6px;margin-top:4px}
+.fuel i{font-style:normal;width:26px;font-weight:700}
+.fuel div{flex:1;height:9px;border:2px solid var(--line);background:#0006}
+.fuel u{display:block;height:100%;transition:width .1s}
+.fuel.gone{opacity:.3}
+label{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+label output{font-family:Anton,Impact,sans-serif;font-size:15px;color:var(--acc)}
+input[type=range]{width:100%;accent-color:var(--hot);margin:2px 0}
+button{font-family:inherit;cursor:pointer;color:#111;background:var(--acc);border:3px solid #111;box-shadow:4px 4px 0 var(--sh);font-weight:800;padding:7px 10px;font-size:13px}
+button:active:not(:disabled){transform:translate(3px,3px);box-shadow:1px 1px 0 var(--sh)}
+button:disabled{opacity:.4;cursor:not-allowed}
+#go{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:24px;letter-spacing:.06em;background:var(--hot);color:#fff;transform:skew(-4deg)}
+.mini{display:flex;gap:6px}.mini button{flex:1;padding:5px 0;background:#fff}
+.mini button.on{background:var(--acc)}
+#fair{background:#7cd4ff}
+#toast{position:fixed;left:50%;top:26%;transform:translate(-50%,0) rotate(-2deg);background:var(--acc);color:#111;border:4px solid #111;box-shadow:6px 6px 0 #000;padding:8px 18px;font-weight:900;font-size:clamp(15px,2.6vw,22px);opacity:0;pointer-events:none;text-align:center;max-width:86vw}
+#toast.show{animation:pop .35s ease-out forwards}
+@keyframes pop{from{transform:translate(-50%,0) rotate(-6deg) scale(.4);opacity:0}to{transform:translate(-50%,0) rotate(-2deg) scale(1);opacity:1}}
+#end{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000a}
+#end.show{display:flex}
+#end div{background:var(--panel);border:4px solid var(--line);box-shadow:8px 8px 0 var(--sh);padding:22px 30px;text-align:center;max-width:88vw}
+#end h2{margin:0 0 8px;font-size:44px;color:var(--acc)}
+#end p{margin:0 0 14px;line-height:1.5}
+.keys{color:var(--dim);font-size:11px;line-height:1.4}
+@media (max-width:700px){
+ #tele{width:46vw;left:6px;font-size:11px;padding:7px}
+ #ctl{width:50vw;right:6px;padding:7px;gap:5px}
+ #go{font-size:19px}.keys{display:none}.row b{font-size:13px}
+ #hint{font-size:11px}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header id="top">
+ <h1 class="an">ROCKET SANDBOX</h1>
+ <ol id="steps">
+  <li>① 이륙 · 1단 연소</li><li>② 1단 분리 · 2단 점화</li><li>③ 2단 분리 · 궤도 진입</li>
+ </ol>
+ <p id="hint"></p>
+</header>
+
+<section id="tele" class="panel">
+ <div class="row"><span>T+</span><b id="t">0.0 s</b></div>
+ <div class="row"><span>고도</span><b id="alt">0.0 km</b></div>
+ <div class="row"><span>속도</span><b id="spd">0 m/s</b></div>
+ <div class="row"><span>수평 속도</span><b id="hs">0 m/s</b></div>
+ <div class="row"><span>동압 Q</span><b id="q">0 kPa</b></div>
+ <div class="row"><span>질량</span><b id="mass">0 t</b></div>
+ <div class="row"><span>근지점 / 원지점</span><b id="orb">– / –</b></div>
+ <div id="fuels"></div>
+</section>
+
+<section id="ctl" class="panel">
+ <button id="go" type="button">LIFTOFF!</button>
+ <button id="fair" type="button">페어링 분리 (F)</button>
+ <label>스로틀 <output id="thrO">100%</output></label>
+ <input id="thr" type="range" min="0" max="100" value="100">
+ <label>피치(수직 기준) <output id="pitO">0°</output></label>
+ <input id="pit" type="range" min="-90" max="90" value="0">
+ <label><span>자동 중력선회 보조</span><input id="auto" type="checkbox" checked></label>
+ <div class="mini" id="warp"><button data-w="1" class="on" type="button">x1</button><button data-w="2" type="button">x2</button><button data-w="5" type="button">x5</button><button data-w="10" type="button">x10</button></div>
+ <button id="rst" type="button" style="background:#fff">리셋 (R)</button>
+ <div class="keys">Space 발사/단분리 · F 페어링 · W/S 스로틀 · A/D 피치 · 1-4 배속</div>
+</section>
+
+<div id="toast"></div>
+<div id="end"><div><h2 class="an" id="eT"></h2><p id="eP"></p><button id="eB" type="button">다시 도전</button> <button id="eC" type="button" style="background:#fff">계속 관찰</button></div></div>
+
+<script>
+const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const C=$('c'),X=C.getContext('2d');let W,H,cy;
+function rs(){const d=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;C.width=W*d;C.height=H*d;X.setTransform(d,0,0,d,0,0);cy=H*.4}
+addEventListener('resize',rs);rs();
+let seed=7;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+const stars=Array.from({length:150},()=>({x:rnd(),y:rnd(),s:rnd()*1.6+.4}));
+const LC=['#2f7d4a','#235a34','#2a6fb5','#c9b26b','#3b8f57'];
+const patches=Array.from({length:90},(_,k)=>({a:k/90*Math.PI*2+rnd()*.05,w:.02+rnd()*.05,wd:6+rnd()*30,c:LC[Math.floor(rnd()*LC.length)]}));
+
+const R=6371000,MU=3.986e14,G0=9.81,PAY=3e3,FAIR=1e3;
+const ST=[{n:'1단',dry:30e3,prop:350e3,F:7500e3,I:290,col:'#ff5a36',w:30,h:52},
+          {n:'2단',dry:6e3,prop:80e3,F:1000e3,I:340,col:'#ffc233',w:24,h:36},
+          {n:'3단',dry:2e3,prop:10e3,F:150e3,I:360,col:'#4cc9f0',w:18,h:26}];
+const HINT=['스로틀을 확인하고 LIFTOFF! 1km 이후 천천히 기울여(중력선회) 수평 속도를 만드세요. 동압(Q)이 가장 큰 Max-Q 구간을 지켜보세요.',
+ '1단 연료가 바닥나면 SPACE로 분리! 2단이 점화됩니다. 고도 100km 이상에서 F로 페어링을 버려 무게를 줄이세요.',
+ '2단 분리 후 3단으로 수평 가속을 이어가세요. 근지점이 150km 이상이면 궤도 진입 성공!'];
+let S,warp=1,keys={};
+
+function reset(){S={t:0,x:0,y:0,vx:0,vy:0,th:0,thT:0,thr:1,auto:$('auto').checked,i:0,prop:ST.map(s=>s.prop),fair:true,launched:false,
+ deb:[],part:[],maxq:0,qpast:false,maxy:0,done:false,crash:false,warned:[false,false,false],space:false,flash:0};
+ $('thr').value=100;$('pit').value=0;$('end').classList.remove('show');ui()}
+function mass(){let m=PAY+(S.fair?FAIR:0);for(let j=S.i;j<3;j++)m+=ST[j].dry+S.prop[j];return m}
+const rho=y=>1.225*Math.exp(-Math.max(y,0)/8500);
+const autoPitch=y=>y<1000?0:Math.min(88,90*Math.sqrt((y-1000)/200000));
+function orb(){const r=R+S.y,E=(S.vx*S.vx+S.vy*S.vy)/2-MU/r,h=r*S.vx;if(E>=0)return null;
+ const a=-MU/(2*E),e=Math.sqrt(Math.max(0,1+2*E*h*h/(MU*MU)));return{pe:a*(1-e)-R,ap:a*(1+e)-R}}
+function thrust(){return S.launched&&!S.done&&S.prop[S.i]>0?ST[S.i].F*S.thr:0}
+
+function step(dt){const s=S;if(!s.launched)return;
+ const m=mass(),r=R+s.y,v=Math.hypot(s.vx,s.vy),T=thrust();
+ const tg=s.auto?autoPitch(s.y):s.thT,mx=12*dt;s.th+=clamp(tg-s.th,-mx,mx);
+ const a=s.th*Math.PI/180,rh=rho(s.y),q=.5*rh*v*v,D=q*4.2;
+ const ax=(T*Math.sin(a)-(v?D*s.vx/v:0))/m-s.vx*s.vy/r;
+ const ay=(T*Math.cos(a)-(v?D*s.vy/v:0))/m-MU/(r*r)+s.vx*s.vx/r;
+ if(T>0){const j=s.i;s.prop[j]=Math.max(0,s.prop[j]-T/(ST[j].I*G0)*dt);
+  if(s.prop[j]<=0&&!s.warned[j]){s.warned[j]=true;msg(j<2?ST[j].n+' 연료 소진! SPACE로 단 분리':'3단 연료 소진');}}
+ s.vx+=ax*dt;s.vy+=ay*dt;s.x+=s.vx*dt*R/r;s.y+=s.vy*dt;s.t+=dt;s.maxy=Math.max(s.maxy,s.y);
+ if(s.y<=0){if(s.maxy>300&&!s.crash){crash();return}s.y=0;s.vy=Math.max(s.vy,0);if(s.maxy<=300){s.vx=0}}
+ if(q>s.maxq)s.maxq=q;else if(!s.qpast&&s.maxq>2000&&q<s.maxq*.93){s.qpast=true;msg('MAX-Q 통과! '+(s.maxq/1000).toFixed(1)+' kPa')}
+ if(s.y>110000&&s.fair&&!s.fw){s.fw=true;msg('페어링 분리 가능 고도 (F)')}
+ for(const d of s.deb){const rr=R+d.y,vv=Math.hypot(d.vx,d.vy)||1,Dd=.5*rho(d.y)*vv*vv*6;
+  d.vx+=(-Dd*d.vx/vv/d.m-d.vx*d.vy/rr)*dt;d.vy+=(-Dd*d.vy/vv/d.m-MU/rr/rr+d.vx*d.vx/rr)*dt;d.x+=d.vx*dt;d.y+=d.vy*dt;d.rot+=d.w*dt}
+ s.deb=s.deb.filter(d=>d.y>-100);
+ const o=orb();if(!s.done&&o&&o.pe>150000&&s.y>140000){s.done=true;s.thr=0;$('thr').value=0;
+  fin('궤도 진입 성공!','근지점 '+(o.pe/1000).toFixed(0)+' km · 원지점 '+(o.ap/1000).toFixed(0)+' km<br>비행 시간 '+s.t.toFixed(0)+' 초 · 남은 3단 연료 '+(s.prop[2]/1000).toFixed(1)+' t')}
+ else if(!s.done&&!s.over&&s.i===2&&s.prop[2]<=0&&(!o||o.pe<150000)){s.over=true;fin('궤도 진입 실패','마지막 연료가 소진되었지만 근지점이 150km에 못 미칩니다.'+(o?'<br>근지점 '+(o.pe/1000).toFixed(0)+' km · 원지점 '+Math.min(99999,o.ap/1000).toFixed(0)+' km':'<br>지구 탈출 궤도')+'<br>중력선회 시점과 스로틀을 바꿔 다시 도전해 보세요.')}
+}
+function crash(){S.crash=true;for(let k=0;k<60;k++)S.part.push({x:0,y:0,vx:(Math.random()-.5)*400,vy:-Math.random()*300,l:1,fire:1});
+ fin('추락!','로켓이 지면에 충돌했습니다. 추력과 피치를 조절해 다시 도전해 보세요.')}
+function fin(t,p){setTimeout(()=>{$('eC').style.display=S.crash?'none':'';$('eT').textContent=t;$('eP').innerHTML=p;$('end').classList.add('show')},S.crash?900:1200)}
+function sep(){if(!S.launched||S.i>=2||S.crash)return;const j=S.i,a=S.th*Math.PI/180;
+ S.deb.push({k:'s',j,x:S.x,y:S.y,vx:S.vx-Math.sin(a)*6,vy:S.vy-Math.cos(a)*6,rot:a,w:(Math.random()-.5)*.9,m:ST[j].dry+S.prop[j]});
+ S.i++;S.flash=1;msg(ST[j].n+' 분리! '+ST[j+1].n+' 점화');ui()}
+function fairing(){if(!S.fair||!S.launched||S.crash)return;const a=S.th*Math.PI/180;S.fair=false;
+ for(const sd of[-1,1])S.deb.push({k:'f',sd,x:S.x,y:S.y,vx:S.vx+Math.cos(a)*9*sd,vy:S.vy-Math.sin(a)*9*sd,rot:a,w:sd*.5,m:500});
+ msg('페어링 분리! 위성 노출');ui()}
+function go(){if(S.crash)return;if(!S.launched){S.launched=true;msg('점화! 리프트오프!');ui()}else sep()}
+
+let tt;function msg(t){const e=$('toast');e.textContent=t;e.classList.remove('show');void e.offsetWidth;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2600)}
+
+/* ---------- drawing ---------- */
+function stage(j,h){const s=ST[j],w=s.w;X.lineWidth=3;X.strokeStyle='#0a0a0a';X.fillStyle=s.col;
+ if(j===0){X.fillStyle='#c9ccd6';X.beginPath();X.moveTo(-w/2,-h*.1);X.lineTo(-w/2-10,0);X.lineTo(-w/2,0);X.closePath();X.moveTo(w/2,-h*.1);X.lineTo(w/2+10,0);X.lineTo(w/2,0);X.closePath();X.fill();X.stroke();X.fillStyle=s.col}
+ X.fillRect(-w/2,-h,w,h);X.strokeRect(-w/2,-h,w,h);X.fillStyle='#fff8';X.fillRect(-w/2+3,-h+4,4,h-8);
+ X.fillStyle='#111';X.fillRect(-w/2,-h*.55,w,5);
+ X.fillStyle='#555';X.beginPath();X.moveTo(-w*.22,0);X.lineTo(-w*.32,7);X.lineTo(w*.32,7);X.lineTo(w*.22,0);X.fill();X.stroke()}
+function nose(w,h,fair){X.lineWidth=3;X.strokeStyle='#0a0a0a';
+ if(fair){X.fillStyle='#f4f4f4';X.beginPath();X.moveTo(-w/2,0);X.lineTo(-w/2,-h*.45);X.quadraticCurveTo(-w*.35,-h*.9,0,-h);X.quadraticCurveTo(w*.35,-h*.9,w/2,-h*.45);X.lineTo(w/2,0);X.closePath();X.fill();X.stroke()}
+ else{X.fillStyle='#ddd';X.fillRect(-4,-14,8,14);X.strokeRect(-4,-14,8,14);X.fillStyle='#3b82f6';X.fillRect(-17,-11,12,8);X.fillRect(5,-11,12,8);X.strokeRect(-17,-11,12,8);X.strokeRect(5,-11,12,8);X.fillStyle='#ffd400';X.beginPath();X.arc(0,-17,3.5,0,7);X.fill()}}
+function half(sd){X.lineWidth=3;X.strokeStyle='#0a0a0a';X.fillStyle='#f4f4f4';X.beginPath();X.moveTo(0,0);X.lineTo(0,-22);X.quadraticCurveTo(sd*5,-18,sd*9,-10);X.lineTo(sd*9,0);X.closePath();X.fill();X.stroke()}
+
+function drawRocket(){const s=S;let tot=s.fair?22:14;for(let j=s.i;j<3;j++)tot+=ST[j].h;
+ X.save();X.translate(W/2,cy);X.rotate(s.th*Math.PI/180);let yb=tot/2;
+ const T=thrust();
+ if(T>0){const vac=1-rho(s.y)/1.225,L=(26+Math.random()*10)*s.thr*(1+vac*1.8)*(s.i===0?1.3:1),w=ST[s.i].w*.6;
+  const g=X.createLinearGradient(0,yb,0,yb+L);g.addColorStop(0,'#fff');g.addColorStop(.3,'#ffd400');g.addColorStop(1,'#ff4d2e00');
+  X.fillStyle=g;X.beginPath();X.moveTo(-w/2,yb+6);X.quadraticCurveTo(0,yb+L*1.2,w/2,yb+6);X.fill()}
+ for(let j=s.i;j<3;j++){X.save();X.translate(0,yb);stage(j,ST[j].h);X.restore();yb-=ST[j].h}
+ X.save();X.translate(0,yb);nose(ST[2].w,22,s.fair);X.restore();
+ if(s.flash>0){X.fillStyle='rgba(255,255,255,'+s.flash+')';X.beginPath();X.arc(0,tot/2-ST[s.i].h,30*(2-s.flash),0,7);X.fill()}
+ X.restore()}
+
+function drawDebris(){for(const d of S.deb){const ox=(d.x-S.x)*.12,oy=-(d.y-S.y)*.12;if(Math.abs(ox)>W||Math.abs(oy)>H*1.5)continue;
+ X.save();X.translate(W/2+ox,cy+oy);X.rotate(d.rot);
+ if(d.k==='s'){X.translate(0,ST[d.j].h/2);stage(d.j,ST[d.j].h)}else half(d.sd);X.restore()}}
+
+function drawWorld(){const a=clamp(S.y/90000,0,1),y=S.y;
+ const mix=(c1,c2)=>`rgb(${lerp(c1[0],c2[0],a)|0},${lerp(c1[1],c2[1],a)|0},${lerp(c1[2],c2[2],a)|0})`;
+ const g=X.createLinearGradient(0,0,0,H);g.addColorStop(0,mix([30,80,170],[2,3,8]));g.addColorStop(.7,mix([130,195,255],[8,12,28]));g.addColorStop(1,mix([170,215,255],[10,14,32]));
+ X.fillStyle=g;X.fillRect(0,0,W,H);
+ const sa=clamp((y-25000)/60000,0,1);if(sa>0){for(const st of stars){X.fillStyle=`rgba(255,255,255,${sa*(.4+st.s/2)})`;X.fillRect(st.x*W,st.y*H,st.s,st.s)}}
+ const dpx=68+55*Math.log10(1+y/100),Rpx=4000/(1+y/40000),ex=W/2,ey=cy+dpx+Rpx,phi=S.x*.02/Rpx;
+ X.fillStyle='#2f7d4a';X.beginPath();X.arc(ex,ey,Rpx,0,7);X.fill();
+ const vis=Math.min(Math.PI,(W*.9)/Rpx+.3);
+ for(const p of patches){let b=(p.a-phi)%(2*Math.PI);if(b>Math.PI)b-=2*Math.PI;if(b<-Math.PI)b+=2*Math.PI;if(Math.abs(b)>vis)continue;
+  const ang=-Math.PI/2+b;X.strokeStyle=p.c;X.lineWidth=p.wd;X.beginPath();X.arc(ex,ey,Rpx-p.wd/2,ang-p.w/2,ang+p.w/2);X.stroke()}
+ X.strokeStyle=`rgba(130,200,255,${.75-.45*a})`;X.lineWidth=5+10*a;X.beginPath();X.arc(ex,ey,Rpx+2,0,7);X.stroke();
+ if(Math.abs(phi)<vis){X.save();X.translate(ex,ey);X.rotate(-phi);
+  X.fillStyle='#777';X.fillRect(-45,-Rpx-5,90,6);X.fillStyle='#d33';X.fillRect(34,-Rpx-62,7,58);X.fillStyle='#bbb';X.fillRect(40,-Rpx-62,14,5);X.fillRect(-60,-Rpx-30,5,26);X.restore()}
+ }
+
+function drawFx(dt){const s=S,T=thrust();
+ if(T>0&&!s.crash){const a=s.th*Math.PI/180,sp=Math.min(160,40+Math.hypot(s.vx,s.vy)*.05);let tot=s.fair?22:14;for(let j=s.i;j<3;j++)tot+=ST[j].h;
+  for(let k=0;k<3;k++){const px=W/2-Math.sin(a)*(tot/2+6),py=cy+Math.cos(a)*(tot/2+6);
+   s.part.push({x:px+(Math.random()-.5)*8,y:py,vx:-Math.sin(a)*sp*.6+(Math.random()-.5)*50,vy:Math.cos(a)*sp+60*Math.random(),l:1,abs:1})}}
+ for(const p of s.part){const rt=Math.min(dt,.05);p.x+=p.vx*rt;p.y+=p.vy*rt;p.l-=rt*(p.fire?1.1:1.2);if(p.fire)p.vy+=300*rt}
+ s.part=s.part.filter(p=>p.l>0);
+ for(const p of s.part){const al=Math.max(0,p.l);if(p.abs){X.fillStyle=`rgba(230,230,235,${al*.35*(1-clamp(s.y/100000,0,1))})`;X.beginPath();X.arc(p.x,p.y,3+(1-al)*14,0,7);X.fill()}
+  else{X.fillStyle=`rgba(255,${120+al*100|0},40,${al})`;X.beginPath();X.arc(W/2+p.x,cy+70+p.y,4+al*5,0,7);X.fill()}}
+ s.flash=Math.max(0,s.flash-dt*2.5)}
+
+/* prograde marker */
+function drawNav(){const v=Math.hypot(S.vx,S.vy);if(v<20)return;const ang=Math.atan2(S.vx,S.vy),r=92;
+ X.save();X.translate(W/2+Math.sin(ang)*r,cy-Math.cos(ang)*r);X.strokeStyle='#7dff7d';X.lineWidth=2.5;X.beginPath();X.arc(0,0,8,0,7);X.moveTo(0,-8);X.lineTo(0,-15);X.moveTo(-8,0);X.lineTo(-15,0);X.moveTo(8,0);X.lineTo(15,0);X.stroke();X.restore()}
+
+/* ---------- HUD ---------- */
+const fuels=$('fuels');fuels.innerHTML=ST.map((s,j)=>`<div class="fuel" id="f${j}"><i>${s.n}</i><div><u style="background:${s.col}"></u></div></div>`).join('');
+function ui(){const g=$('go');g.textContent=!S.launched?'LIFTOFF!':S.i<2?'STAGE SEP!':'LAST STAGE';g.disabled=S.launched&&S.i>=2||S.crash;
+ $('fair').disabled=!S.fair||!S.launched;[...$('steps').children].forEach((li,k)=>{li.className=S.launched&&k===S.i?'on':(!S.launched&&k===0?'on':(k<S.i?'ok':''))});
+ if(S.done)[...$('steps').children].forEach(li=>li.className='ok');$('hint').textContent=HINT[S.i]}
+function hud(){const s=S,v=Math.hypot(s.vx,s.vy),q=.5*rho(s.y)*v*v;
+ $('t').textContent=s.t.toFixed(1)+' s';$('alt').textContent=(s.y/1000).toFixed(1)+' km';$('spd').textContent=Math.round(v).toLocaleString()+' m/s';
+ $('hs').textContent=Math.round(s.vx).toLocaleString()+' m/s';$('q').textContent=(q/1000).toFixed(1)+' kPa';$('mass').textContent=(mass()/1000).toFixed(0)+' t';
+ const o=orb();$('orb').textContent=o?`${Math.max(-99,o.pe/1000).toFixed(0)} / ${Math.min(99999,o.ap/1000).toFixed(0)} km`:'탈출';
+ ST.forEach((st,j)=>{const f=$('f'+j);f.classList.toggle('gone',j<s.i);f.querySelector('u').style.width=(j<s.i?0:s.prop[j]/st.prop*100)+'%'});
+ $('thrO').textContent=Math.round(s.thr*100)+'%';$('hint').textContent=(s.launched&&!s.done&&!s.crash&&s.prop[s.i]<=0)?'연료 소진 · 관성 비행 중입니다. 단 분리(SPACE)나 x10 배속으로 이어가세요.':HINT[s.i];
+ if(s.auto)$('pit').value=Math.round(s.th);$('pitO').textContent=Math.round(s.th)+'°'}
+
+/* ---------- input ---------- */
+$('go').onclick=go;$('fair').onclick=fairing;$('rst').onclick=reset;$('eB').onclick=reset;$('eC').onclick=()=>$('end').classList.remove('show');
+$('thr').oninput=e=>{S.thr=e.target.value/100};
+$('pit').oninput=e=>{$('auto').checked=false;S.auto=false;S.thT=+e.target.value};
+$('auto').onchange=e=>{S.auto=e.target.checked;if(!S.auto)S.thT=S.th};
+document.querySelectorAll('#warp button').forEach(b=>b.onclick=()=>setW(+b.dataset.w));
+function setW(w){warp=w;document.querySelectorAll('#warp button').forEach(b=>b.classList.toggle('on',+b.dataset.w===w))}
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.repeat&&(k===' '||k==='f'))return;
+ if(k===' '){e.preventDefault();go()}else if(k==='f')fairing();else if(k==='r')reset();else if('1234'.includes(k)&&k)setW([1,2,5,10][+k-1]);
+ else if(k.startsWith('arrow'))e.preventDefault();keys[k]=true});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function keyStep(dt){let dth=0,dt2=0;if(keys.a||keys.arrowleft)dth-=1;if(keys.d||keys.arrowright)dth+=1;if(keys.w||keys.arrowup)dt2+=1;if(keys.s||keys.arrowdown)dt2-=1;
+ if(dth){$('auto').checked=false;S.auto=false;S.thT=clamp(S.thT+dth*30*dt,-90,90);$('pit').value=S.thT}
+ if(dt2){S.thr=clamp(S.thr+dt2*.6*dt,0,1);$('thr').value=Math.round(S.thr*100)}}
+
+/* ---------- loop ---------- */
+reset();let last=performance.now();
+function loop(ts){const rd=Math.min((ts-last)/1000,.05);last=ts;keyStep(rd);
+ if(!S.crash){let sim=rd*warp;while(sim>0){const d=Math.min(.02,sim);step(d);sim-=d}}
+ drawWorld();drawFx(rd);drawDebris();if(!S.crash)drawRocket();drawNav();hud();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
